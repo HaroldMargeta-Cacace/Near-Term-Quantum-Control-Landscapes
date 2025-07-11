@@ -93,10 +93,11 @@ def train_QAOA(f, N, p):
   return res.nit, res.success, res.fun, stored_parameters, total_time
 
 # TODO: Make sure to change how you're importing graphs
-graph_dicts = load_graphs('test (2).pkl')
+graph_dicts = load_graphs('Test_Dataset_1')
+graph_dicts = graph_dicts[0:10]
 
 # TODO: Make sure to vary values of p
-p_list = [3]
+p_list = [3, 6, 12, 24, 48]
 
 df = pd.DataFrame()
 
