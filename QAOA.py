@@ -94,7 +94,6 @@ def train_QAOA(f, N, p):
 
 # TODO: Make sure to change how you're importing graphs
 graph_dicts = load_graphs('test (2).pkl')
-graph_dicts = graph_dicts[0:10]
 
 # TODO: Make sure to vary values of p
 p_list = [3]
