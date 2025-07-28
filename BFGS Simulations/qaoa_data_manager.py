@@ -64,7 +64,7 @@ def filter_untested_graphs(graph_dicts, p_list, optimizer_names, result_files=No
 
     if not result_files:
         print("No QAOA result files found. Returning all input graphs.")
-        return graph_dicts, [p_list for _ in graph_dicts], [{p: optimizer_names for p in p_list} for _ in graph_dicts]
+        return graph_dicts, [{p: optimizer_names for p in p_list} for _ in graph_dicts]
 
     # Load all result files into a single DataFrame
     dfs = []
@@ -82,7 +82,7 @@ def filter_untested_graphs(graph_dicts, p_list, optimizer_names, result_files=No
 
     if not dfs:
         print("No valid QAOA result data found. Returning all input graphs.")
-        return graph_dicts, [p_list for _ in graph_dicts], [{p: optimizer_names for p in p_list} for _ in graph_dicts]
+        return graph_dicts, [{p: optimizer_names for p in p_list} for _ in graph_dicts]
 
     full_df = pd.concat(dfs, ignore_index=True)
 
@@ -176,7 +176,7 @@ def generate_output_filenames(graph_dicts, p_list, optimizer_names, input_filena
         'graphs': "_".join(input_filenames) + "_features"
     }
     
-def save_results_dataframe(df, graph_dicts, filenames, desired_append=None):
+def save_results_dataframe(df, filenames, desired_append=None):
     """
     Saves the full QAOA training results dataframe to both CSV and pickle formats.
 
@@ -188,7 +188,6 @@ def save_results_dataframe(df, graph_dicts, filenames, desired_append=None):
         desired name: filename (without extension) used to deviate from automated names from input_filenames
     """
     if desired_name is None:
-        filenames = generate_output_filenames(graph_dicts, p_list, optimizer_names, input_filenames)
         df.to_csv(filenames['csv'], index=False)
         df.to_pickle(filenames['pkl'])
     
@@ -206,7 +205,7 @@ def save_summary_statistics(df, filenames):
     """
     summary_rows = []
 
-    for opt_name in optimizer_names:
+    for optimizer in df['optimizer'].unique():
         df_opt = df[df['optimizer'] == opt_name]
 
         for p_val in sorted(df_opt['p'].unique()):
@@ -292,7 +291,7 @@ def save_complete_results(qaoa_df, outnames):
     # Run detailed analysis and save regressions
     all_results = []
 
-    for optimizer in optimizer_names:
+    for optimizer in df['optimizer'].unique():
         df_opt = merged[merged["optimizer"] == optimizer]
 
         for p_val in df_opt["p"].unique():
