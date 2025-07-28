@@ -168,10 +168,15 @@ def generate_output_filenames(graph_dicts, p_list, optimizer_names, input_filena
         'csv': f"{base_name}.csv",
         'pkl': f"{base_name}.pkl",
         'summary_csv': f"{base_name}_summary.csv",
-        'summary_pkl': f"{base_name}_summary.pkl"
+        'summary_pkl': f"{base_name}_summary.pkl",
+        'complete_csv': f"{base_name}_complete.csv",
+        'complete_pkl':  f"{base_name}_complete.pkl",
+        'feature_correlations_csv': f"{base_name}_feature_exp_correlations.csv",
+        'feature_correlations_pkl': f"{base_name}_feature_exp_correlations.pkl",
+        'graphs': "_".join(input_filenames) + "_features"
     }
     
-def save_results_dataframe(df, graph_dicts, optimizer_names, p_list, input_filenames):
+def save_results_dataframe(df, graph_dicts, filenames, desired_append=None):
     """
     Saves the full QAOA training results dataframe to both CSV and pickle formats.
 
@@ -180,18 +185,24 @@ def save_results_dataframe(df, graph_dicts, optimizer_names, p_list, input_filen
         graph_dicts (list of dict): The list of graph dictionaries used.
         p_list (list of int): The list of QAOA depths.
         optimizer_names (list of str): The optimizers used.
+        desired name: filename (without extension) used to deviate from automated names from input_filenames
     """
-    filenames = generate_output_filenames(graph_dicts, p_list, optimizer_names, input_filenames)
-    df.to_csv(filenames['csv'], index=False)
-    df.to_pickle(filenames['pkl'])
+    if desired_name is None:
+        filenames = generate_output_filenames(graph_dicts, p_list, optimizer_names, input_filenames)
+        df.to_csv(filenames['csv'], index=False)
+        df.to_pickle(filenames['pkl'])
+    
+    else:
+        df.to_csv(filenames['base_name'] + desired_name + '.csv', index=False)
+        df.to_pickle(filenames['base_name'] + desired_name + '.pkl')
         
 def exp_fit(x, a, b):
     return a * np.exp(b * x)
 
-def save_summary_statistics(df, graph_dicts, optimizer_names, p_list, fnames):
+def save_summary_statistics(df, filenames):
     """
     Computes and saves summary statistics of QAOA training results for each p and optimizer,
-    including exponential fit via linear regression on log(mean_grad_var).
+    including exponential fit via linear regression on log(mean_grad_var). filenames is a dict of filenames
     """
     summary_rows = []
 
@@ -263,21 +274,17 @@ def save_summary_statistics(df, graph_dicts, optimizer_names, p_list, fnames):
     summary_df = pd.DataFrame(summary_rows)
     summary_df = summary_df.sort_values(by=['optimizer', 'p']).reset_index(drop=True)
     summary_df['rank_by_f_calls'] = summary_df.groupby('p')['avg_f_calls'].rank(method='min').astype(int)
-
-    filenames = generate_output_filenames(graph_dicts, p_list, optimizer_names, fnames)
     summary_df.to_csv(filenames['summary_csv'], index=False)
     summary_df.to_pickle(filenames['summary_pkl'])
     
-def save_complete_results(qaoa_df, graph_dicts, optimizer_names, p_list, fnames):
-    outnames = generate_output_filenames(graph_dicts, p_list, optimizer_names, fnames)
-
+def save_complete_results(qaoa_df, outnames):
     # Compute and merge graph features
     gfeatures = gfeat.compute_and_save_graph_features(graph_dicts, "_".join(fnames) + "Features")
     merged = gfeat.merge_on_adjacency(qaoa_df, gfeatures)
 
     # Save merged dataframe
-    merged.to_csv(outnames['base_name'] + "COMPLETE.csv", index=False)
-    merged.to_pickle(outnames['base_name'] + "COMPLETE.pkl")
+    merged.to_csv(outnames['complete_csv'], index=False)
+    merged.to_pickle(outnames['complete_pkl'])
 
     # All feature names (excluding metadata columns)
     feature_cols = [col for col in gfeatures.columns if col not in ['adj', 'adj_key', 'Number of vertices', 'N']]
@@ -310,8 +317,8 @@ def save_complete_results(qaoa_df, graph_dicts, optimizer_names, p_list, fnames)
         corr_df = corr_df.sort_values(by='pearson_r_log').reset_index(drop=True)
 
         # Save correlation analysis
-        corr_df.to_csv(outnames['base_name'] + "FEATURE_EXP_CORRELATIONS.csv", index=False)
-        corr_df.to_pickle(outnames['base_name'] + "FEATURE_EXP_CORRELATIONS.pkl")
+        corr_df.to_csv(outnames['feature_correlations_csv'], index=False)
+        corr_df.to_pickle(outnames['feature_correlations_pkl'])
     else:
         print("No correlation results were produced.")
     
