@@ -4,15 +4,11 @@ import networkx as nx
 import pickle
 import pandas as pd
 from tqdm import tqdm
-import time
 import os
 import sklearn
 from scipy.stats import linregress
 from sklearn.preprocessing import StandardScaler
 
-import numdifftools as nd
-import qokit
-from qokit import get_qaoa_objective
 import qaoa_opt as qopt
 import qaoa_train as qtrain
 import qaoa_graph_features as gfeat
@@ -187,13 +183,13 @@ def save_results_dataframe(df, filenames, desired_append=None):
         optimizer_names (list of str): The optimizers used.
         desired name: filename (without extension) used to deviate from automated names from input_filenames
     """
-    if desired_name is None:
+    if desired_append is None:
         df.to_csv(filenames['csv'], index=False)
         df.to_pickle(filenames['pkl'])
     
     else:
-        df.to_csv(filenames['base_name'] + desired_name + '.csv', index=False)
-        df.to_pickle(filenames['base_name'] + desired_name + '.pkl')
+        df.to_csv(filenames['base_name'] + desired_append + '.csv', index=False)
+        df.to_pickle(filenames['base_name'] + desired_append + '.pkl')
         
 def exp_fit(x, a, b):
     return a * np.exp(b * x)
@@ -205,7 +201,7 @@ def save_summary_statistics(df, filenames):
     """
     summary_rows = []
 
-    for optimizer in df['optimizer'].unique():
+    for opt_name in optimizer_names:
         df_opt = df[df['optimizer'] == opt_name]
 
         for p_val in sorted(df_opt['p'].unique()):
@@ -291,7 +287,7 @@ def save_complete_results(qaoa_df, outnames):
     # Run detailed analysis and save regressions
     all_results = []
 
-    for optimizer in df['optimizer'].unique():
+    for optimizer in optimizer_names:
         df_opt = merged[merged["optimizer"] == optimizer]
 
         for p_val in df_opt["p"].unique():
