@@ -5,7 +5,7 @@ import pickle
 import pandas as pd
 from tqdm import tqdm
 import time
-
+import os
 import numdifftools as nd
 import qokit
 from qokit import get_qaoa_objective
@@ -38,9 +38,22 @@ optimizer_names = ['bfgs_qaoa']
 graph_dicts, untested_dicts = qmngr.filter_untested_graphs(all_dicts, p_list, optimizer_names)
 df = pd.DataFrame()
 graph_loop = tqdm(range(len(graph_dicts)), desc="Starting...", position=0)
+outnames = generate_output_filenames(graph_dicts, p_list, optimizer_names, filelist)
+
+# Elements of the dictionary outnames
+# 'base_name': f"{base_name}",
+# 'csv': f"{base_name}.csv",
+# 'pkl': f"{base_name}.pkl",
+# 'summary_csv': f"{base_name}_summary.csv",
+# 'summary_pkl': f"{base_name}_summary.pkl",
+# 'complete_csv': f"{base_name}_complete.csv",
+# 'complete_pkl':  f"{base_name}_complete.pkl",
+# 'feature_correlations_csv': f"{base_name}_feature_exp_correlations.csv",
+# 'feature_correlations_pkl': f"{base_name}_feature_exp_correlations.pkl",
+# 'graphs': "_".join(input_filenames) + "_features"
 
 for i in graph_loop:
-    G = nx.Graph(graph_dict)
+    G = nx.Graph(graph_dicts[i])
     terms = get_mis_terms(G)
     adj = nx.to_numpy_array(G)
 
@@ -123,9 +136,44 @@ for i in graph_loop:
                     'approx': [approx],
                     'percent_error': [p_error]
                 })
+                
                 df = pd.concat([df, new_row], ignore_index=True)
                 
+    # Create temporary saves every 25 iterations
+    if (i + 1) % 25 == 0:
+        qmgr.save_results_dataframe(df, outnames, f'temp{i + 1}')
+
+        if (i + 1) / 25 > 1:
+            try:
+                os.remove(outnames['base_name'] + f'temp{i}.csv')
+            except FileNotFoundError:
+                print(f"Temp CSV file temp{i}.csv not found for removal.")
+            except Exception as e:
+                print(f"An error occurred while removing temp{i}.csv: {e}")
+
+            try:
+                os.remove(outnames['base_name'] + f'temp{i}.pkl')
+            except FileNotFoundError:
+                print(f"Temp PKL file temp{i}.pkl not found for removal.")
+            except Exception as e:
+                print(f"An error occurred while removing temp{i}.pkl: {e}")
+                
 # SAVE
-qmngr.save_results_dataframe(df, graph_dicts, optimizer_names, p_list, filelist)
-qmngr.save_summary_statistics(df, graph_dicts, optimizer_names, p_list, filelist)
-qmngr.save_complete_results(df, graph_dicts, optimizer_names, p_list, filelist)
+qmngr.save_results_dataframe(df, outnames)
+qmngr.save_summary_statistics(df, outnames)
+qmngr.save_complete_results(df, outnames)
+
+# Remove temp saves
+try:
+    os.remove(outnames['base_name'] + f'temp{len(graph_dicts)}.csv')
+except FileNotFoundError:
+    print("Final temp CSV file not found for removal.")
+except Exception as e:
+    print(f"An error occurred during final CSV cleanup: {e}")
+
+try:
+    os.remove(outnames['base_name'] + f'temp{len(graph_dicts)}.pkl')
+except FileNotFoundError:
+    print("Final temp PKL file not found for removal.")
+except Exception as e:
+    print(f"An error occurred during final PKL cleanup: {e}")
