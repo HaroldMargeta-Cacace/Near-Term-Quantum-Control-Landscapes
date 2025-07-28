@@ -6,6 +6,7 @@ import pandas as pd
 from tqdm import tqdm
 import time
 import os
+
 import numdifftools as nd
 import qokit
 from qokit import get_qaoa_objective
@@ -31,14 +32,15 @@ def get_sols(diag, N):
     return [format(i, f'0{N}b') for i, e in enumerate(diag) if e == min_val]
 
 # Configure the runs
-filelist = ['Dataset_Up_To_Order_7_a','Dataset_Up_To_Order_7_b','Dataset_Up_To_Order_7_c']
+filelist = ['Dataset_Up_To_Order_7_a','Dataset_Up_To_Order_7_b',
+            'Dataset_Up_To_Order_7_c']
 all_dicts = qmngr.load_and_sort_graphs(filelist)
 p_list = [10, 15]
 optimizer_names = ['bfgs_qaoa']
 graph_dicts, untested_dicts = qmngr.filter_untested_graphs(all_dicts, p_list, optimizer_names)
 df = pd.DataFrame()
 graph_loop = tqdm(range(len(graph_dicts)), desc="Starting...", position=0)
-outnames = generate_output_filenames(graph_dicts, p_list, optimizer_names, filelist)
+outnames = qmngr.generate_output_filenames(graph_dicts, p_list, optimizer_names, filelist)
 
 # Elements of the dictionary outnames
 # 'base_name': f"{base_name}",
@@ -79,7 +81,7 @@ for i in graph_loop:
             'bfgs_qaoa': {'max_iters': 1000}
         }
         for opt_name in optimizer_names:
-            if p in untested_dict and opt_name in untested_dict.get(p):
+            if p in untested_dicts[i] and opt_name in untested_dicts[i].get(p):
                 f = get_qaoa_objective(N, terms=terms, parameterization='theta')
 
                 graph_loop.set_description(f"Training QAOA (p={p}, opt={opt_name})")
@@ -140,21 +142,22 @@ for i in graph_loop:
                 df = pd.concat([df, new_row], ignore_index=True)
                 
     # Create temporary saves every 25 iterations
-    if (i + 1) % 25 == 0:
-        qmgr.save_results_dataframe(df, outnames, f'temp{i + 1}')
+    itersiz = 25
+    if (i + 1) % itersiz == 0:
+        qmngr.save_results_dataframe(df, outnames, f'temp{i + 1}')
 
         if (i + 1) / 25 > 1:
             try:
-                os.remove(outnames['base_name'] + f'temp{i}.csv')
+                os.remove(outnames['base_name'] + f'temp{i + 1 - itersiz}.csv')
             except FileNotFoundError:
-                print(f"Temp CSV file temp{i}.csv not found for removal.")
+                print(f"Temp CSV file temp{i + 1 - itersiz}.csv not found for removal.")
             except Exception as e:
-                print(f"An error occurred while removing temp{i}.csv: {e}")
+                print(f"An error occurred while removing temp{i + 1 - itersiz}.csv: {e}")
 
             try:
-                os.remove(outnames['base_name'] + f'temp{i}.pkl')
+                os.remove(outnames['base_name'] + f'temp{i + 1 - itersiz}.pkl')
             except FileNotFoundError:
-                print(f"Temp PKL file temp{i}.pkl not found for removal.")
+                print(f"Temp PKL file temp{i + 1 - itersiz}.pkl not found for removal.")
             except Exception as e:
                 print(f"An error occurred while removing temp{i}.pkl: {e}")
                 
