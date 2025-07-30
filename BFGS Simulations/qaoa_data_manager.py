@@ -167,8 +167,10 @@ def generate_output_filenames(graph_dicts, p_list, optimizer_names, input_filena
         'summary_pkl': f"{base_name}_summary.pkl",
         'complete_csv': f"{base_name}_complete.csv",
         'complete_pkl':  f"{base_name}_complete.pkl",
-        'feature_correlations_csv': f"{base_name}_feature_exp_correlations.csv",
-        'feature_correlations_pkl': f"{base_name}_feature_exp_correlations.pkl",
+        'feature_correlations_loss_variance_csv': f"{base_name}_loss_feature_exp_correlations.csv",
+        'feature_correlations_loss_variance_pkl': f"{base_name}_loss_feature_exp_correlations.pkl",
+        'feature_correlations_mean_grad_variance_csv': f"{base_name}_grad_feature_exp_correlations.csv",
+        'feature_correlations_mean_grad_variance_pkl': f"{base_name}_grad_feature_exp_correlations.pkl",
         'graphs': "_".join(input_filenames) + "_features"
     }
     
@@ -178,10 +180,7 @@ def save_results_dataframe(df, filenames, desired_append=None):
 
     Args:
         df (pd.DataFrame): Full training results dataframe.
-        graph_dicts (list of dict): The list of graph dictionaries used.
-        p_list (list of int): The list of QAOA depths.
-        optimizer_names (list of str): The optimizers used.
-        desired name: filename (without extension) used to deviate from automated names from input_filenames
+        desired append: desired used to deviate from automated names from input_filenames
     """
     if desired_append is None:
         df.to_csv(filenames['csv'], index=False)
@@ -190,18 +189,15 @@ def save_results_dataframe(df, filenames, desired_append=None):
     else:
         df.to_csv(filenames['base_name'] + desired_append + '.csv', index=False)
         df.to_pickle(filenames['base_name'] + desired_append + '.pkl')
-        
-def exp_fit(x, a, b):
-    return a * np.exp(b * x)
 
 def save_summary_statistics(df, filenames):
     """
     Computes and saves summary statistics of QAOA training results for each p and optimizer,
-    including exponential fit via linear regression on log(mean_grad_var). filenames is a dict of filenames
+    including exponential fit via linear regression on log(mean_grad_var) and log(loss_var).
     """
     summary_rows = []
 
-    for opt_name in optimizer_names:
+    for opt_name in df['optimizer'].unique():
         df_opt = df[df['optimizer'] == opt_name]
 
         for p_val in sorted(df_opt['p'].unique()):
@@ -232,38 +228,37 @@ def save_summary_statistics(df, filenames):
                 'max_percent_error': df_p['percent_error'].max(),
             }
 
-            if 'mean_grad_variance' in df_p.columns and 'graph' in df_p.columns:
-                try:
-                    grad_vars = df_p['mean_grad_variance']
-                    sizes = df_p['graph'].apply(lambda gd: nx.Graph(gd).number_of_nodes())
-                    valid = (grad_vars > 0) & (~sizes.isna())
+            sizes = df_p['graph'].apply(lambda gd: nx.Graph(gd).number_of_nodes())
 
-                    if valid.sum() >= 2:
-                        x = sizes[valid].values
-                        y = grad_vars[valid].values
-                        log_y = np.log(y)
+            for regvar in ['mean_grad_variance', 'loss_variance']:
+                if regvar in df_p.columns:
+                    try:
+                        variances = df_p[regvar]
+                        valid = (variances > 0) & (~sizes.isna())
 
-                        slope, intercept, r, _, _ = linregress(x, log_y)
+                        if valid.sum() >= 2:
+                            x = sizes[valid].values
+                            y = variances[valid].values
+                            log_y = np.log(y)
 
-                        a_fit = np.exp(intercept)
-                        b_fit = slope
+                            slope, intercept, r, _, _ = linregress(x, log_y)
 
-                        row['avg_mean_grad_variance'] = y.mean()
-                        row['exp_fit_a'] = a_fit
-                        row['exp_fit_b'] = b_fit
-                        row['pearson_corr_exp_fit'] = r
-                    else:
-                        row['avg_mean_grad_variance'] = None
-                        row['exp_fit_a'] = None
-                        row['exp_fit_b'] = None
-                        row['pearson_corr_exp_fit'] = None
+                            row['avg_' + regvar] = y.mean()
+                            row['exp_fit_a' +  '_' + regvar] = np.exp(intercept)
+                            row['exp_fit_b' +  '_' + regvar] = slope
+                            row['pearson_corr_exp_fit' +  '_' + regvar] = r
+                        else:
+                            row['avg_' + regvar] = None
+                            row['exp_fit_a' + '_' + regvar] = None
+                            row['exp_fit_b' + '_' + regvar] = None
+                            row['pearson_corr_exp_fit' + '_' + regvar] = None
 
-                except Exception:
-                    row['avg_mean_grad_variance'] = None
-                    row['exp_fit_a'] = None
-                    row['exp_fit_b'] = None
-                    row['pearson_corr_exp_fit'] = None
-
+                    except Exception:
+                        row['avg_' + regvar] = None
+                        row['exp_fit_a' +  '_' + regvar] = None
+                        row['exp_fit_b' +  '_' + regvar] = None
+                        row['pearson_corr_exp_fit' +  '_' + regvar] = None
+                        
             summary_rows.append(row)
 
     summary_df = pd.DataFrame(summary_rows)
@@ -272,9 +267,10 @@ def save_summary_statistics(df, filenames):
     summary_df.to_csv(filenames['summary_csv'], index=False)
     summary_df.to_pickle(filenames['summary_pkl'])
     
-def save_complete_results(qaoa_df, outnames):
+    
+def save_complete_results(qaoa_df, graph_dicts, outnames):
     # Compute and merge graph features
-    gfeatures = gfeat.compute_and_save_graph_features(graph_dicts, "_".join(fnames) + "Features")
+    gfeatures = gfeat.compute_and_save_graph_features(graph_dicts, outnames['graphs'])
     merged = gfeat.merge_on_adjacency(qaoa_df, gfeatures)
 
     # Save merged dataframe
@@ -283,43 +279,68 @@ def save_complete_results(qaoa_df, outnames):
 
     # All feature names (excluding metadata columns)
     feature_cols = [col for col in gfeatures.columns if col not in ['adj', 'adj_key', 'Number of vertices', 'N']]
+    regvars = ['mean_grad_variance', 'loss_variance']
+    results_dict = {var: [] for var in regvars}
 
-    # Run detailed analysis and save regressions
-    all_results = []
+    # Estimate total number of iterations for outer tqdm
+    total_jobs = sum(
+        len(merged[merged["optimizer"] == optimizer]["p"].unique()) 
+        for optimizer in df['optimizer'].unique()
+    )
 
-    for optimizer in optimizer_names:
-        df_opt = merged[merged["optimizer"] == optimizer]
+    outer_loop = tqdm(total=total_jobs, desc="Analyzing optimizers/p", position=0)
+
+    for opt_name in merged['optimizer'].unique():
+        df_opt = merged[merged['optimizer'] == opt_name]
 
         for p_val in df_opt["p"].unique():
             df_p = df_opt[df_opt["p"] == p_val]
 
-            for feat in feature_cols:
-                results_df = analyze_feature_regressions(
-                    df_p,
-                    feat,
-                    min_cluster_size=max(5, len(df_p) // 20),
-                    min_samples=max(2, len(df_p) // 40)
-                )
+            inner_loop = tqdm(
+                total=len(regvars) * len(feature_cols),
+                desc=f"{optimizer}, p={p_val}",
+                leave=False,
+                position=1
+            )
 
-                if results_df is not None and not results_df.empty:
-                    results_df = results_df.copy()
-                    results_df['optimizer'] = optimizer
-                    results_df['p'] = p_val
-                    all_results.append(results_df)
+            for regvar in regvars:
+                for feat in feature_cols:
+                    results_df = analyze_feature_regressions(
+                        df_p,
+                        feat,
+                        regvar,
+                        min_cluster_size=max(5, len(df_p) // 20),
+                        min_samples=max(2, len(df_p) // 40)
+                    )
 
-    if all_results:
-        corr_df = pd.concat(all_results, ignore_index=True)
-        corr_df = corr_df.sort_values(by='pearson_r_log').reset_index(drop=True)
+                    if results_df is not None and not results_df.empty:
+                        results_df = results_df.copy()
+                        results_df['optimizer'] = optimizer
+                        results_df['p'] = p_val
+                        results_dict[regvar].append(results_df)
 
-        # Save correlation analysis
-        corr_df.to_csv(outnames['feature_correlations_csv'], index=False)
-        corr_df.to_pickle(outnames['feature_correlations_pkl'])
-    else:
-        print("No correlation results were produced.")
+                    inner_loop.update(1)
+
+            inner_loop.close()
+            outer_loop.update(1)
+
+    outer_loop.close()
+
+    for regvar in regvars:
+        if results_dict[regvar]:
+            corr_df = pd.concat(results_dict[regvar], ignore_index=True)
+            corr_df = corr_df.sort_values(by='pearson_r_log').reset_index(drop=True)
+
+            # Save correlation analysis
+            corr_df.to_csv(outnames['feature_correlations_' + regvar + '_csv'], index=False)
+            corr_df.to_pickle(outnames['feature_correlations_' + regvar + '_pkl'])
+        else:
+            print("No correlation results were produced for " + regvar + ".")
     
 def analyze_feature_regressions(
     df,
     feature,
+    regvar,
     min_cluster_size=8,
     min_samples=None,
     min_points=4
@@ -344,9 +365,9 @@ def analyze_feature_regressions(
             if is_integer:
                 grouped = df_p.groupby(feature)
                 for feat_val, group in grouped:
-                    if len(group) < min_points or any(group['mean_grad_variance'] <= 0):
+                    if len(group) < min_points or any(group[regvar] <= 0):
                         continue
-                    log_y = np.log(group['mean_grad_variance'].values)
+                    log_y = np.log(group[regvar].values)
                     slope, intercept, r, _, _ = linregress(group['N'].values, log_y)
 
                     results.append({
@@ -382,10 +403,10 @@ def analyze_feature_regressions(
                         continue  # skip noise
 
                     group = df_p[df_p['cluster'] == cluster_id]
-                    if len(group) < min_points or any(group['mean_grad_variance'] <= 0):
+                    if len(group) < min_points or any(group[regvar] <= 0):
                         continue
 
-                    log_y = np.log(group['mean_grad_variance'].values)
+                    log_y = np.log(group[regvar].values)
                     slope, intercept, r, _, _ = linregress(group['N'].values, log_y)
 
                     results.append({
