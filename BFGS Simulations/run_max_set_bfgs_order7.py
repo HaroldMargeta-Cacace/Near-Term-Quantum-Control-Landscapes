@@ -164,7 +164,7 @@ for i in graph_loop:
 # SAVE
 qmngr.save_results_dataframe(df, outnames)
 qmngr.save_summary_statistics(df, outnames)
-qmngr.save_complete_results(df, outnames)
+qmngr.save_complete_results(df, graph_dicts, outnames)
 
 # Remove temp saves
 try:
