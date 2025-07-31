@@ -172,8 +172,6 @@ def generate_output_filenames(graph_dicts, p_list, optimizer_names, input_filena
         'feature_correlations_mean_grad_variance_csv': f"{base_name}_grad_feature_exp_correlations.csv",
         'feature_correlations_mean_grad_variance_pkl': f"{base_name}_grad_feature_exp_correlations.pkl",
         'graphs': "_".join(input_filenames) + "_features",
-        'error_metrics_csv': f"{base_name}_error_metrics.csv",
-        'error_metrics_pkl': f"{base_name}_error_metrics.pkl",
     }
     
 def save_results_dataframe(df, filenames, desired_append=None):
