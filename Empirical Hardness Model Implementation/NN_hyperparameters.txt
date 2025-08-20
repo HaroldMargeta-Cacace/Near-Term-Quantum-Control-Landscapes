@@ -1,0 +1,11 @@
+Neural Network Hyperparameters:
+
+n_layers = 3,
+n_neurons_0 = 32,
+n_neurons_0 = 32,
+n_neurons_0 = 16,
+activation = "relu",
+optimizer = "adam",
+lr = 0.006
+
+Note: learning rate and loss functions are specified in the file Neural_Network_Empirical_Hardness_Model.ipynb
