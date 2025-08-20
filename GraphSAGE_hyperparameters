@@ -1,0 +1,11 @@
+GraphSAGE Hyperparameters:
+
+hidden_channels = 64,
+input_layers = 8,
+dropout_p = 0.5,
+aggr = "mean",
+conv_pool_layers = 1,
+conv_layers = 2,
+lin_layers = 1,
+
+Note: learning rate, weight decay, and loss functions are specified in the file GCN.ipynb
