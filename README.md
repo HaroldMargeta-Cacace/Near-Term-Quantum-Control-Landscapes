@@ -152,4 +152,4 @@ This is a research codebase. For questions about specific implementations or to 
 
 ## Citation
 
-If you use this code in your research, please reach out to hmargeta@ttu.edu for a preprint. 
+If you use this code (https://github.com/HaroldMargeta-Cacace/Near-Term-Quantum-Control-Landscapes/) in your research, please reach out to hmargeta@ttu.edu for a preprint. 
