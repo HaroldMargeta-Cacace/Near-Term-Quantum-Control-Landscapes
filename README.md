@@ -153,6 +153,3 @@ This is a research codebase. For questions about specific implementations or to 
 ## Citation
 
 If you use this code in your research, please reach out to hmargeta@ttu.edu for a preprint. 
-<span style="display:none">[^1][^10][^11][^12][^13][^14][^15][^2][^3][^4][^5][^6][^7][^8][^9]</span>
-
-<div style="text-align: center">⁂</div>
